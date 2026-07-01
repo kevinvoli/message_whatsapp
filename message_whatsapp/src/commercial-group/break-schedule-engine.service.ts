@@ -145,6 +145,7 @@ export class BreakScheduleEngine {
             schedule,
             todayStr,
             nowHHmm,
+            tz,
             takenSet,
             exclusionsBySubGroup.get(commercial.subGroup.id) ?? [],
             audioUrlMap,
@@ -161,6 +162,7 @@ export class BreakScheduleEngine {
     schedule: SubGroupBreakSchedule,
     todayStr: string,
     nowHHmm: string,
+    tz: string,
     takenSet: Set<string>,
     exclusions: BreakExclusion[],
     audioUrlMap: Map<string, string>,
@@ -208,7 +210,7 @@ export class BreakScheduleEngine {
       messageText: schedule.popupMessageText,
       audioUrl: schedule.popupAudioAssetId ? (audioUrlMap.get(schedule.popupAudioAssetId) ?? null) : null,
       reminderIntervalMinutes: schedule.reminderIntervalMinutes,
-      expiresAt: this.buildExpiresAt(todayStr, end),
+      expiresAt: this.buildExpiresAt(todayStr, end, tz),
     });
 
     this.lastPromptSentAt.set(key, Date.now());
@@ -224,7 +226,20 @@ export class BreakScheduleEngine {
     }).format(new Date()).slice(0, 5);
   }
 
-  buildExpiresAt(todayStr: string, endHHmm: string): string {
-    return `${todayStr}T${endHHmm}:00.000Z`;
+  buildExpiresAt(todayStr: string, endHHmm: string, tz: string): string {
+    const [h, m] = endHHmm.split(':').map(Number);
+    const [year, month, day] = todayStr.split('-').map(Number);
+    // Date construite en UTC avec les valeurs numériques locales
+    const base = new Date(Date.UTC(year, month - 1, day, h, m, 0));
+    // Calculer l'offset DST-aware de la timezone à cet instant
+    const localStr = base.toLocaleString('en-US', {
+      timeZone: tz,
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const [localH, localM] = localStr.replace('24:', '00:').split(':').map(Number);
+    const offsetMinutes = (localH * 60 + localM) - (base.getUTCHours() * 60 + base.getUTCMinutes());
+    return new Date(base.getTime() - offsetMinutes * 60_000).toISOString();
   }
 }

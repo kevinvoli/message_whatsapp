@@ -330,6 +330,35 @@ export class CommercialPlanningService {
     }
   }
 
+  async findByCommercialAndDate(
+    commercialId: string,
+    date: string,
+  ): Promise<CommercialPlanning | null> {
+    return this.planningRepo
+      .createQueryBuilder('p')
+      .addSelect('p.timeSlot')
+      .where('p.commercialId = :commercialId', { commercialId })
+      .andWhere('p.date = :date', { date })
+      .getOne();
+  }
+
+  async findByCommercialAndMonth(
+    commercialId: string,
+    year: number,
+    month: number,
+  ): Promise<CommercialPlanning[]> {
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return this.planningRepo
+      .createQueryBuilder('p')
+      .addSelect('p.timeSlot')
+      .where('p.commercialId = :commercialId', { commercialId })
+      .andWhere('p.date BETWEEN :start AND :end', { start, end })
+      .orderBy('p.date', 'ASC')
+      .getMany();
+  }
+
   async getAbsenceSummary(
     year: number,
     month: number,

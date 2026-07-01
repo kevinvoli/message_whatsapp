@@ -26,7 +26,9 @@ export function useBreakPrompt() {
       setPrompt(payload);
       if (payload.audioUrl && audioRef.current) {
         audioRef.current.src = payload.audioUrl;
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch((err: Error) => {
+          console.warn('[BreakPrompt] Lecture audio bloquée :', err.message);
+        });
       }
     };
 

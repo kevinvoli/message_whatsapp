@@ -21,6 +21,8 @@ import MediaPanel from '@/components/panel/MediaPanel';
 import { getPanelMedia } from '@/lib/api';
 import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import BreakPromptModal from '@/components/break/BreakPromptModal';
+import { PlanningBadgeJour } from '@/components/planning/PlanningBadgeJour';
+import { PlanningVueCommercial } from '@/components/planning/PlanningVueCommercial';
 
 const VALID_FILTER_STATUSES = ['all', 'unread', 'nouveau'];
 
@@ -58,6 +60,7 @@ const WhatsAppPageContent = () => {
   const [panelEnabled, setPanelEnabled] = useState(false);
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
   const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+  const [showPlanning, setShowPlanning] = useState(false);
   const testBreak = searchParams.get('testBreak') === '1';
   const breakPrompt = testBreak
     ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: "C'est l'heure de ta pause !", audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() }
@@ -192,6 +195,45 @@ const WhatsAppPageContent = () => {
 
       <ConversationRestrictionModal />
       <BreakPromptModal prompt={breakPrompt} audioRef={breakAudioRef} onTakeBreak={handleTakeBreak} />
+
+      {/* Bouton Mon planning — coin inférieur gauche, au-dessus de la barre de pause */}
+      <button
+        onClick={() => setShowPlanning(true)}
+        className="fixed bottom-4 left-4 z-30 bg-white border border-gray-200 shadow-md rounded-full px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors flex items-center gap-1.5"
+        title="Mon planning"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        Mon planning
+      </button>
+
+      {/* Modale planning */}
+      {showPlanning && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+          onClick={() => setShowPlanning(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-800 text-sm">Mon planning</h2>
+              <button
+                onClick={() => setShowPlanning(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none w-6 h-6 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+            <div className="mb-3">
+              <PlanningBadgeJour />
+            </div>
+            <PlanningVueCommercial />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

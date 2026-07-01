@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CommercialPlanningService } from './commercial-planning.service';
 import { CreateSelfAbsenceDto } from './dto/create-planning.dto';
@@ -23,5 +23,28 @@ export class CommercialSelfPlanningController {
       declaredBy:   req.user.userId,
       timeSlot:     dto.timeSlot,
     });
+  }
+
+  @Get('today')
+  getPlanningToday(@Request() req: { user: JwtUser }) {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.planningService.findByCommercialAndDate(req.user.userId, today);
+  }
+
+  @Get('date/:date')
+  getPlanningByDate(
+    @Param('date') date: string,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.planningService.findByCommercialAndDate(req.user.userId, date);
+  }
+
+  @Get('month/:year/:month')
+  getPlanningMonth(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+    @Request() req: { user: JwtUser },
+  ) {
+    return this.planningService.findByCommercialAndMonth(req.user.userId, year, month);
   }
 }

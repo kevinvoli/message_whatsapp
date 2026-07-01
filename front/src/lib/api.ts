@@ -1,7 +1,7 @@
 // front/src/lib/api.ts
 import { CommercialStatsDto, RestrictionConfig } from '@/types/chat';
 import { PanelMediaResponse } from '@/types/media-panel';
-import type { QuizTodayStatus, QuizStartResult, QuizSubmitResult, QuizAttemptResult, QuizPdf, QuizHistoryEntry } from '@/lib/definitions';
+import type { QuizTodayStatus, QuizStartResult, QuizSubmitResult, QuizAttemptResult, QuizPdf, QuizHistoryEntry, CommercialPlanningEntry } from '@/lib/definitions';
 
 export interface MessageRestrictionConfig {
   enabled: boolean;
@@ -152,4 +152,46 @@ export async function takeBreak(breakScheduleId: string): Promise<{ ok: true }> 
     body: JSON.stringify({ breakScheduleId }),
   });
   return handleResponse<{ ok: true }>(response);
+}
+
+export async function getPlanningToday(): Promise<CommercialPlanningEntry | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/planning/self/today`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    return response.json() as Promise<CommercialPlanningEntry>;
+  } catch {
+    return null;
+  }
+}
+
+export async function getPlanningByDate(date: string): Promise<CommercialPlanningEntry | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/planning/self/date/${date}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    return response.json() as Promise<CommercialPlanningEntry>;
+  } catch {
+    return null;
+  }
+}
+
+export async function getPlanningMonth(
+  year: number,
+  month: number,
+): Promise<CommercialPlanningEntry[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/planning/self/month/${year}/${month}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) return [];
+    return response.json() as Promise<CommercialPlanningEntry[]>;
+  } catch {
+    return [];
+  }
 }

@@ -85,3 +85,12 @@ export interface QuizHistoryEntry {
   isPassed: boolean | null;
   completedAt: string | null;
 }
+
+export interface CommercialPlanningEntry {
+  id: string;
+  date: string;
+  type: 'absence' | 'exceptional';
+  timeSlot: 'full' | 'morning' | 'afternoon';
+  reason: string | null;
+  linkedCommercialId: string | null;
+}
