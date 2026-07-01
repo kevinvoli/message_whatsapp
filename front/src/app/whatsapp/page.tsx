@@ -183,23 +183,38 @@ const WhatsAppPageContent = () => {
       />
       <div className="flex-1 flex flex-col min-w-0">
         <audio ref={breakAudioRef} className="hidden" />
-        {breakPrompt && (
-          <div className="flex items-center justify-between gap-4 text-xs text-orange-700 bg-orange-50 px-3 py-2 border-b border-orange-200 shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium whitespace-nowrap">Pause</span>
-              <span className="text-orange-400">—</span>
-              <span className="truncate">{breakPrompt.subGroupName}</span>
-              <span className="text-orange-400">—</span>
-              <span className="whitespace-nowrap">fin à <strong>{breakPrompt.endTime}</strong></span>
-            </div>
-            <button
-              onClick={handleTakeBreak}
-              className="shrink-0 text-orange-600 font-medium hover:underline whitespace-nowrap"
-            >
-              Prendre ma pause
-            </button>
+
+        {/* Barre du haut — toujours visible : pause (gauche) + bouton planning (droite) */}
+        <div className="flex items-center justify-between border-b border-gray-100 bg-white px-3 py-1.5 shrink-0">
+          <div className="flex-1 min-w-0">
+            {breakPrompt && (
+              <div className="flex items-center gap-2 text-xs text-orange-700">
+                <span className="font-medium whitespace-nowrap">Pause</span>
+                <span className="text-orange-400">—</span>
+                <span className="truncate">{breakPrompt.subGroupName}</span>
+                <span className="text-orange-400">—</span>
+                <span className="whitespace-nowrap">fin à <strong>{breakPrompt.endTime}</strong></span>
+                <button
+                  onClick={handleTakeBreak}
+                  className="ml-2 text-orange-600 font-medium hover:underline whitespace-nowrap shrink-0"
+                >
+                  Prendre
+                </button>
+              </div>
+            )}
           </div>
-        )}
+          <button
+            onClick={() => setShowPlanning(true)}
+            className="ml-3 shrink-0 flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors"
+            title="Mon planning"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Mon planning
+          </button>
+        </div>
+
         {viewingPdf ? (
           <PdfViewerPanel pdf={viewingPdf} onClose={() => setViewingPdf(null)} />
         ) : viewMode === 'conversations' ? (
@@ -214,26 +229,14 @@ const WhatsAppPageContent = () => {
 
       <ConversationRestrictionModal />
 
-      {/* Bouton Mon planning — coin inférieur gauche */}
-      <button
-        onClick={() => setShowPlanning(true)}
-        className="fixed bottom-4 left-4 z-30 bg-white border border-gray-200 shadow-md rounded-full px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors flex items-center gap-1.5"
-        title="Mon planning"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        Mon planning
-      </button>
-
       {/* Modale planning */}
       {showPlanning && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           onClick={() => setShowPlanning(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4"
+            className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
