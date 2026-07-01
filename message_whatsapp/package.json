@@ -23,7 +23,7 @@
         "migration:run": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/database/data-source.ts",
         "migration:revert": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/database/data-source.ts",
         "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js",
-        "prepare": "husky"
+        "prepare": "node -e \"if(require('fs').existsSync('.git')){require('child_process').execSync('husky',{stdio:'inherit'})}\" || true"
     },
     "lint-staged": {
         "*.{ts}": ["prettier --write"],

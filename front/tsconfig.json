@@ -38,6 +38,10 @@
     "next.config.js"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/test/**",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "vitest.config.ts"
   ]
 }
