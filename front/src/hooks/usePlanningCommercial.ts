@@ -20,10 +20,12 @@ export function usePlanningMois(year: number, month: number) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let ignore = false;
     setLoading(true);
     getPlanningMonth(year, month)
-      .then(setEntries)
-      .finally(() => setLoading(false));
+      .then((r) => { if (!ignore) setEntries(r); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
   }, [year, month]);
 
   return { entries, loading };

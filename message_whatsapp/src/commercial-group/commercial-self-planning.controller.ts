@@ -27,8 +27,10 @@ export class CommercialSelfPlanningController {
 
   @Get('today')
   getPlanningToday(@Request() req: { user: JwtUser }) {
-    const today = new Date().toISOString().slice(0, 10);
-    return this.planningService.findByCommercialAndDate(req.user.userId, today);
+    return this.planningService.findByCommercialAndDate(
+      req.user.userId,
+      this.planningService.getTodayString(),
+    );
   }
 
   @Get('date/:date')
