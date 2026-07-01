@@ -7,16 +7,14 @@ import { PanelTop } from 'lucide-react';
 import { useChatStore } from "@/store/chatStore";
 import { Phone } from "lucide-react";
 import { useEffect } from "react";
-import { useBreakPrompt } from "@/hooks/useBreakPrompt";
 
 interface ChatMainAreaProps {
   panelEnabled?: boolean;
   panelOpen?: boolean;
   onTogglePanel?: () => void;
-  testBreak?: boolean;
 }
 
-export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel, testBreak = false }: ChatMainAreaProps = {}) {
+export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }: ChatMainAreaProps = {}) {
   const { isConnected: isWebSocketConnected } = useSocket();
   const {
     conversations,
@@ -30,11 +28,6 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel, t
     sendError,
     setSendError,
   } = useChatStore();
-
-  const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
-  const breakPrompt = testBreak
-    ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: null, audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 3600_000).toISOString() }
-    : breakPromptReal;
 
   const totalMessages = selectedConversation ? messages?.length : 0;
 
@@ -56,33 +49,8 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel, t
 
   return (
     <div className="flex-1 flex flex-col">
-      <audio ref={breakAudioRef} className="hidden" />
-
-      {/* Bandeau pause — pleine largeur, tout en haut, même pattern que ClientInfoBanner */}
-      {breakPrompt && (
-        <div className="flex items-center justify-between gap-4 text-xs text-orange-700 bg-orange-50 px-3 py-2 border-b border-orange-200 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-medium whitespace-nowrap">Pause</span>
-            <span className="text-orange-500">—</span>
-            <span className="truncate">{breakPrompt.subGroupName}</span>
-            <span className="text-orange-500">—</span>
-            <span className="whitespace-nowrap">fin à <strong>{breakPrompt.endTime}</strong></span>
-            {breakPrompt.messageText && (
-              <span className="text-orange-500 truncate hidden sm:inline">· {breakPrompt.messageText}</span>
-            )}
-          </div>
-          <button
-            onClick={handleTakeBreak}
-            className="shrink-0 text-orange-600 font-medium hover:underline whitespace-nowrap"
-          >
-            Prendre ma pause
-          </button>
-        </div>
-      )}
-
-      {/* Barre panneau médias */}
       {panelEnabled && (
-        <div className="flex justify-end border-b border-gray-100 bg-white px-3 py-1.5 shrink-0">
+        <div className="flex justify-end border-b border-gray-100 bg-white px-3 py-1.5">
           <button
             onClick={onTogglePanel}
             title="Panneau médias"
@@ -92,7 +60,6 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel, t
           </button>
         </div>
       )}
-
       {selectedConversation ? (
         <>
           {isLoading ? (
@@ -116,19 +83,19 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel, t
             </>
           )}
 
-          <ChatInput
-            chat_id={selectedConversation?.chat_id}
-            onSendMessage={sendMessage}
-            onTypingStart={onTypingStart}
-            onTypingStop={onTypingStop}
-            isConnected={isWebSocketConnected}
-            disabled={!!selectedConversation?.readonly || windowExpired || noChannel || selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
-            windowExpired={windowExpired && !noChannel && selectedConversation?.status !== 'fermé' && selectedConversation?.status !== 'converti'}
-            conversationClosed={selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
-            noChannel={noChannel}
-            lastClientMessageAt={selectedConversation?.last_client_message_at}
-            firstResponseDeadlineAt={selectedConversation?.first_response_deadline_at}
-          />
+              <ChatInput
+                chat_id={selectedConversation?.chat_id}
+                onSendMessage={sendMessage}
+                onTypingStart={onTypingStart}
+                onTypingStop={onTypingStop}
+                isConnected={isWebSocketConnected}
+                disabled={!!selectedConversation?.readonly || windowExpired || noChannel || selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
+                windowExpired={windowExpired && !noChannel && selectedConversation?.status !== 'fermé' && selectedConversation?.status !== 'converti'}
+                conversationClosed={selectedConversation?.status === 'fermé' || selectedConversation?.status === 'converti'}
+                noChannel={noChannel}
+                lastClientMessageAt={selectedConversation?.last_client_message_at}
+                firstResponseDeadlineAt={selectedConversation?.first_response_deadline_at}
+              />
 
           {error && (
             <div className="bg-red-100 border-t border-red-200 p-2 text-center">

@@ -19,6 +19,7 @@ import { logger } from '@/lib/logger';
 import ConversationRestrictionModal from '@/components/ConversationRestrictionModal';
 import MediaPanel from '@/components/panel/MediaPanel';
 import { getPanelMedia } from '@/lib/api';
+import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { PlanningBadgeJour } from '@/components/planning/PlanningBadgeJour';
 import { PlanningVueCommercial } from '@/components/planning/PlanningVueCommercial';
 
@@ -59,6 +60,10 @@ const WhatsAppPageContent = () => {
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
   const [showPlanning, setShowPlanning] = useState(false);
   const testBreak = searchParams.get('testBreak') === '1';
+  const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+  const breakPrompt = testBreak
+    ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: null, audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 3600_000).toISOString() }
+    : breakPromptReal;
 
   useEffect(() => {
     getPanelMedia(1, 1)
@@ -176,13 +181,33 @@ const WhatsAppPageContent = () => {
         onSearchChange={setSearchQuery}
         onViewPdf={setViewingPdf}
       />
-      {viewingPdf ? (
-        <PdfViewerPanel pdf={viewingPdf} onClose={() => setViewingPdf(null)} />
-      ) : viewMode === 'conversations' ? (
-        <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} testBreak={testBreak} />
-      ) : (
-        <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />
-      )}
+      <div className="flex-1 flex flex-col min-w-0">
+        <audio ref={breakAudioRef} className="hidden" />
+        {breakPrompt && (
+          <div className="flex items-center justify-between gap-4 text-xs text-orange-700 bg-orange-50 px-3 py-2 border-b border-orange-200 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium whitespace-nowrap">Pause</span>
+              <span className="text-orange-400">—</span>
+              <span className="truncate">{breakPrompt.subGroupName}</span>
+              <span className="text-orange-400">—</span>
+              <span className="whitespace-nowrap">fin à <strong>{breakPrompt.endTime}</strong></span>
+            </div>
+            <button
+              onClick={handleTakeBreak}
+              className="shrink-0 text-orange-600 font-medium hover:underline whitespace-nowrap"
+            >
+              Prendre ma pause
+            </button>
+          </div>
+        )}
+        {viewingPdf ? (
+          <PdfViewerPanel pdf={viewingPdf} onClose={() => setViewingPdf(null)} />
+        ) : viewMode === 'conversations' ? (
+          <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} />
+        ) : (
+          <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />
+        )}
+      </div>
       {panelEnabled && panelOpen && (
         <MediaPanel onClose={() => setPanelOpen(false)} />
       )}
