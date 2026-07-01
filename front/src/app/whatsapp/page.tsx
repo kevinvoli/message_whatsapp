@@ -19,7 +19,6 @@ import { logger } from '@/lib/logger';
 import ConversationRestrictionModal from '@/components/ConversationRestrictionModal';
 import MediaPanel from '@/components/panel/MediaPanel';
 import { getPanelMedia } from '@/lib/api';
-import { useBreakPrompt } from '@/hooks/useBreakPrompt';
 import { PlanningBadgeJour } from '@/components/planning/PlanningBadgeJour';
 import { PlanningVueCommercial } from '@/components/planning/PlanningVueCommercial';
 
@@ -59,11 +58,6 @@ const WhatsAppPageContent = () => {
   const [panelEnabled, setPanelEnabled] = useState(false);
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
   const [showPlanning, setShowPlanning] = useState(false);
-  const testBreak = searchParams.get('testBreak') === '1';
-  const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
-  const breakPrompt = testBreak
-    ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: null, audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 3600_000).toISOString() }
-    : breakPromptReal;
 
   useEffect(() => {
     getPanelMedia(1, 1)
@@ -182,30 +176,10 @@ const WhatsAppPageContent = () => {
         onViewPdf={setViewingPdf}
       />
       <div className="flex-1 flex flex-col min-w-0">
-        <audio ref={breakAudioRef} className="hidden" />
-
-        {/* Barre du haut — toujours visible : pause (gauche) + bouton planning (droite) */}
-        <div className="flex items-center justify-between border-b border-gray-100 bg-white px-3 py-1.5 shrink-0">
-          <div className="flex-1 min-w-0">
-            {breakPrompt && (
-              <div className="flex items-center gap-2 text-xs text-orange-700">
-                <span className="font-medium whitespace-nowrap">Pause</span>
-                <span className="text-orange-400">—</span>
-                <span className="truncate">{breakPrompt.subGroupName}</span>
-                <span className="text-orange-400">—</span>
-                <span className="whitespace-nowrap">fin à <strong>{breakPrompt.endTime}</strong></span>
-                <button
-                  onClick={handleTakeBreak}
-                  className="ml-2 text-orange-600 font-medium hover:underline whitespace-nowrap shrink-0"
-                >
-                  Prendre
-                </button>
-              </div>
-            )}
-          </div>
+        <div className="flex items-center justify-end border-b border-gray-100 bg-white px-3 py-1.5 shrink-0">
           <button
             onClick={() => setShowPlanning(true)}
-            className="ml-3 shrink-0 flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded-lg transition-colors"
             title="Mon planning"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
