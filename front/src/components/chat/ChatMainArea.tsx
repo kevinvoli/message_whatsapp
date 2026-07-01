@@ -13,9 +13,10 @@ interface ChatMainAreaProps {
   panelEnabled?: boolean;
   panelOpen?: boolean;
   onTogglePanel?: () => void;
+  testBreak?: boolean;
 }
 
-export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }: ChatMainAreaProps = {}) {
+export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel, testBreak = false }: ChatMainAreaProps = {}) {
   const { isConnected: isWebSocketConnected } = useSocket();
   const {
     conversations,
@@ -30,7 +31,10 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
     setSendError,
   } = useChatStore();
 
-  const { prompt: breakPrompt, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+  const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+  const breakPrompt = testBreak
+    ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: null, audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 3600_000).toISOString() }
+    : breakPromptReal;
 
   const totalMessages = selectedConversation ? messages?.length : 0;
 

@@ -58,6 +58,7 @@ const WhatsAppPageContent = () => {
   const [panelEnabled, setPanelEnabled] = useState(false);
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
   const [showPlanning, setShowPlanning] = useState(false);
+  const testBreak = searchParams.get('testBreak') === '1';
 
   useEffect(() => {
     getPanelMedia(1, 1)
@@ -178,7 +179,7 @@ const WhatsAppPageContent = () => {
       {viewingPdf ? (
         <PdfViewerPanel pdf={viewingPdf} onClose={() => setViewingPdf(null)} />
       ) : viewMode === 'conversations' ? (
-        <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} />
+        <ChatMainArea panelEnabled={panelEnabled} panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(p => !p)} testBreak={testBreak} />
       ) : (
         <ContactDetailView onSwitchToConversations={() => handleViewModeChange('conversations')} />
       )}
