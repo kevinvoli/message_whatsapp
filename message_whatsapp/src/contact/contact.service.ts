@@ -93,6 +93,46 @@ export class ContactService {
     return { data: contacts, total };
   }
 
+  async findAllKeyset(
+    limit = 50,
+    cursor?: string,
+    search?: string,
+  ): Promise<{ data: Contact[]; nextCursor: string | null; hasMore: boolean }> {
+    const qb = this.repo.createQueryBuilder('contact');
+
+    if (search?.trim()) {
+      const term = `%${search.trim()}%`;
+      qb.where(
+        'contact.name LIKE :term OR contact.phone LIKE :term OR contact.chat_id LIKE :term',
+        { term },
+      );
+    }
+
+    if (cursor) {
+      const { at, id } = JSON.parse(Buffer.from(cursor, 'base64url').toString()) as { at: string; id: string };
+      qb.andWhere(
+        '(contact.createdAt < :at OR (contact.createdAt = :at AND contact.id < :id))',
+        { at, id },
+      );
+    }
+
+    const rows = await qb
+      .orderBy('contact.createdAt', 'DESC')
+      .addOrderBy('contact.id', 'DESC')
+      .take(limit + 1)
+      .getMany();
+
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
+    const last = data[data.length - 1];
+    const nextCursor =
+      hasMore && last
+        ? Buffer.from(JSON.stringify({ at: last.createdAt.toISOString(), id: last.id })).toString('base64url')
+        : null;
+
+    return { data, nextCursor, hasMore };
+  }
+
   async findAllByPosteId(posteId: string) {
     return this.repo
       .createQueryBuilder('contact')

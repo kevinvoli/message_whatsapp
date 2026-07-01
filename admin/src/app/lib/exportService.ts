@@ -6,7 +6,7 @@ import {
   getPerformanceCommerciaux,
   getChats,
   getMessages,
-  getClients,
+  getClientsOffset,
   getPostes,
   getChannels,
   getMessageAuto,
@@ -208,7 +208,7 @@ const EXPORT_VIEWS: Partial<Record<string, ExportDef>> = {
     title: 'Clients',
     columns: ['ID', 'Nom', 'Téléphone', 'Actif', 'Statut appel', 'Nb messages', 'Créé le'],
     fetchData: async () => {
-      const result = await getClients(500, 0);
+      const result = await getClientsOffset(500, 0);
       return result.data.map((c) => ({
         ID: safe(c.id),
         Nom: safe(c.name),

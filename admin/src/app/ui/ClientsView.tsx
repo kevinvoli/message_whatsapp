@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Edit, Trash2, UserPlus, RefreshCw, Search, X } from 'lucide-react';
+import { Edit, Trash2, UserPlus, RefreshCw, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDate } from '@/app/lib/dateUtils';
 import { Client } from '@/app/lib/definitions';
 import { createClient, deleteClient, updateClient, getClients } from '@/app/lib/api';
 import { EntityTable } from '@/app/ui/crud/EntityTable';
 import { EntityFormModal } from '@/app/ui/crud/EntityFormModal';
-import { Pagination } from '@/app/ui/Pagination';
+
+const PAGE_SIZE = 50;
 
 interface ClientsViewProps {
   onRefresh?: () => void;
@@ -15,9 +16,9 @@ interface ClientsViewProps {
 
 export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [clients, setClients] = useState<Client[]>([]);
-  const [total, setTotal] = useState(0);
-  const [limit, setLimit] = useState(50);
-  const [offset, setOffset] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([]);
+  const [activeCursor, setActiveCursor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
   const [searchInput, setSearchInput] = useState('');
@@ -32,24 +33,29 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   const [formChatId, setFormChatId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
 
-  const loadPage = useCallback(async (l: number, o: number, s?: string) => {
+  const load = useCallback(async (cursor?: string, search?: string) => {
     setLoading(true);
     try {
-      const result = await getClients(l, o, s);
+      const result = await getClients(PAGE_SIZE, cursor, search);
       setClients(result.data);
-      setTotal(result.total);
+      setNextCursor(result.nextCursor);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void loadPage(limit, offset, searchQuery); }, [loadPage, limit, offset, searchQuery]);
+  useEffect(() => { void load(activeCursor, searchQuery); }, [load, activeCursor, searchQuery]);
+
+  function resetToFirstPage() {
+    setActiveCursor(undefined);
+    setCursorHistory([]);
+  }
 
   function handleSearchChange(value: string) {
     setSearchInput(value);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
-      setOffset(0);
+      resetToFirstPage();
       setSearchQuery(value);
     }, 1000);
   }
@@ -57,7 +63,20 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
   function clearSearch() {
     setSearchInput('');
     setSearchQuery('');
-    setOffset(0);
+    resetToFirstPage();
+  }
+
+  function handleNext() {
+    if (!nextCursor) return;
+    setCursorHistory(prev => [...prev, activeCursor]);
+    setActiveCursor(nextCursor);
+  }
+
+  function handlePrev() {
+    if (!cursorHistory.length) return;
+    const prev = cursorHistory[cursorHistory.length - 1];
+    setCursorHistory(h => h.slice(0, -1));
+    setActiveCursor(prev);
   }
 
   const openAddModal = () => {
@@ -80,7 +99,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
     try {
       await createClient({ name: formName, phone: formPhone, chat_id: formChatId || undefined, is_active: formIsActive });
       setShowAddModal(false);
-      await loadPage(limit, offset);
+      resetToFirstPage();
     } finally {
       setLoading(false);
     }
@@ -94,7 +113,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
       await updateClient(currentClient.id, { name: formName, phone: formPhone, chat_id: formChatId || undefined, is_active: formIsActive });
       setShowEditModal(false);
       setCurrentClient(null);
-      await loadPage(limit, offset);
+      await load(activeCursor, searchQuery);
     } finally {
       setLoading(false);
     }
@@ -105,18 +124,20 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
     setLoading(true);
     try {
       await deleteClient(id);
-      await loadPage(limit, offset);
+      await load(activeCursor, searchQuery);
     } finally {
       setLoading(false);
     }
   };
+
+  const page = cursorHistory.length + 1;
+  const hasPrev = cursorHistory.length > 0;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Gestion des Clients</h2>
         <div className="flex items-center gap-3">
-          {/* Champ de recherche */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
@@ -136,7 +157,7 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
               </button>
             )}
           </div>
-          <button type="button" onClick={() => void loadPage(limit, offset, searchQuery)}
+          <button type="button" onClick={() => void load(activeCursor, searchQuery)}
             title="Rafraîchir" aria-label="Rafraîchir"
             className="p-2 rounded-full bg-slate-900 text-white hover:bg-slate-800">
             <RefreshCw className="w-4 h-4" />
@@ -184,11 +205,27 @@ export default function ClientsView({ onRefresh }: ClientsViewProps) {
             },
           ]}
         />
-        <Pagination
-          total={total} limit={limit} offset={offset}
-          onPageChange={(o) => setOffset(o)}
-          onLimitChange={(l) => { setLimit(l); setOffset(0); }}
-        />
+        <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
+          <span>Page {page}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrev}
+              disabled={!hasPrev || loading}
+              className="flex items-center gap-1 rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Précédent
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={!nextCursor || loading}
+              className="flex items-center gap-1 rounded border border-gray-300 px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Suivant
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       <EntityFormModal isOpen={showAddModal} title="Ajouter un client" onClose={() => setShowAddModal(false)}

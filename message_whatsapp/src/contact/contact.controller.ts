@@ -39,13 +39,14 @@ export class ContactController {
   findAll(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('cursor') cursor?: string,
     @Query('search') search?: string,
   ) {
-    return this.service.findAll(
-      limit ? Math.min(parseInt(limit, 10), 200) : 50,
-      offset ? parseInt(offset, 10) : 0,
-      search,
-    );
+    const parsedLimit = Math.min(limit ? parseInt(limit, 10) : 50, 200);
+    if (cursor !== undefined) {
+      return this.service.findAllKeyset(parsedLimit, cursor || undefined, search);
+    }
+    return this.service.findAll(parsedLimit, offset ? parseInt(offset, 10) : 0, search);
   }
 
   @Get(':id')

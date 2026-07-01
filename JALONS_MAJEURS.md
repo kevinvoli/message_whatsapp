@@ -18,7 +18,7 @@ Elles constituent des critères de sortie (Definition of Done) pour chaque livra
 | R4 | Zéro `any` TypeScript | PR review |
 | R5 | Zéro requête SQL dans une boucle — utiliser `IN (:...ids)` ou jointures | PR review |
 | R6 | Tout endpoint exposé publiquement doit être rate-limité | PR review |
-| R7 | Les constantes Socket.IO ne sont jamais dupliquées — shared package uniquement | PR review |
+| R7 | Toute modification des événements Socket.IO est synchronisée sur tous les projets (script CI `check:socket-sync`) — **interdit** : package partagé ou `file:` reference croisée (projets indépendants, déployables séparément) | PR review |
 | R8 | Tout élément scrollable dans une flex column doit avoir `min-h-0` (lui-même + tous les conteneurs flex intermédiaires dans la chaîne). Pattern : `flex-1 min-h-0 overflow-y-auto` | PR review |
 
 ## Points d'excellence à préserver à chaque jalon

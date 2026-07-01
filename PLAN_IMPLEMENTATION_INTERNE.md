@@ -3,6 +3,8 @@
 > Branche : `production` · Référence : `RAPPORT_ARCHITECTURE.md`
 > Scope : uniquement les améliorations sans dépendance à un service externe tiers
 
+> **Règle d'architecture fondamentale :** Les 3 projets (`message_whatsapp/`, `front/`, `admin/`) sont entièrement auto-suffisants et déployables sur des serveurs distincts. Tout fichier hors de ces 3 répertoires (scripts/, plans .md, docker-compose, package.json racine) est **outillage local uniquement** — les projets ne doivent jamais en dépendre.
+
 ---
 
 ## Règles de développement durable — OBLIGATIONS ABSOLUES
@@ -14,7 +16,10 @@ R3. Toute migration SQL doit avoir un commentaire décrivant le rollback
 R4. Zéro `any` TypeScript — bloquant en PR review
 R5. Zéro requête SQL dans une boucle — utiliser IN (:...ids) ou jointures
 R6. Tout endpoint exposé publiquement doit être rate-limité
-R7. Les constantes Socket.IO ne sont jamais dupliquées — shared package uniquement
+R7. Les constantes Socket.IO ne sont jamais modifiées sans synchroniser TOUS les projets
+    → Backend = source de vérité ; front/admin maintiennent des copies identiques
+    → Script CI `check:socket-sync` bloque le merge en cas de divergence
+    → INTERDIT : package partagé ou `file:` reference croisée (projets indépendants)
 R8. Tout élément scrollable dans une flex column doit porter `min-h-0`
     → Pattern obligatoire : `flex-1 min-h-0 overflow-y-auto`
     → Tout conteneur flex intermédiaire dans la même chaîne doit aussi avoir `min-h-0`
@@ -315,38 +320,66 @@ it('timeout déclenche le callback après 30s', () => {
 
 ## Phase 2 — Refactoring interne (Jalon J2)
 
-### 2.1 Package partagé `socket-contracts` (R7)
+### 2.1 Validation CI — synchronisation des événements Socket.IO (R7) ✅
 
-**Structure cible :**
+> **Règle d'architecture absolue :** les 3 projets (`message_whatsapp/`, `front/`, `admin/`) sont indépendants et peuvent être déployés sur des serveurs différents. **Aucun package partagé** — zéro `file:` reference croisée dans les `package.json`.
+
+**Problème à résoudre :** le fichier `socket-events.constants.ts` est dupliqué entre backend et frontend. Un renommage silencieux casse la communication sans erreur visible.
+
+**Solution retenue : script CI de diff automatique**
+
+Le backend est la **source de vérité**. Le front et l'admin maintiennent des copies identiques. Un script CI bloque le merge si les fichiers divergent.
+
+**Script `scripts/check-socket-events-sync.js` (à la racine du monorepo) :**
+```javascript
+const fs = require('fs');
+const crypto = require('crypto');
+
+const files = [
+  'message_whatsapp/src/realtime/events/socket-events.constants.ts',
+  'front/src/lib/socket/socket-events.constants.ts',
+];
+
+const hashes = files.map((f) => {
+  const content = fs.readFileSync(f, 'utf8')
+    .replace(/\/\/.*/g, '')       // ignore les commentaires
+    .replace(/\s+/g, ' ')         // normalise les espaces
+    .trim();
+  return { file: f, hash: crypto.createHash('sha256').update(content).digest('hex') };
+});
+
+const [ref, ...others] = hashes;
+const divergent = others.filter((h) => h.hash !== ref.hash);
+
+if (divergent.length > 0) {
+  console.error('❌ socket-events.constants.ts désynchronisé :');
+  divergent.forEach((h) => console.error(`   ${h.file}`));
+  console.error(`   Référence : ${ref.file}`);
+  process.exit(1);
+}
+
+console.log('✅ socket-events.constants.ts synchronisé sur tous les projets');
 ```
-packages/
-  socket-contracts/
-    package.json
-    tsconfig.json
-    src/
-      events.ts
-      payloads.ts
-      rooms.ts
-      index.ts
+
+**Ajouter dans `package.json` racine :**
+```json
+"scripts": {
+  "check:socket-sync": "node scripts/check-socket-events-sync.js"
+}
 ```
 
-**`packages/socket-contracts/src/events.ts` :**
-```typescript
-export const CHAT_EVENTS = {
-  CONVERSATION_LIST:   'CONVERSATION_LIST',
-  CONVERSATION_UPSERT: 'CONVERSATION_UPSERT',
-  MESSAGE_ADD:         'MESSAGE_ADD',
-  // ... tous les events existants
-} as const;
+**Procédure de modification d'un event Socket.IO :**
+1. Modifier `message_whatsapp/src/realtime/events/socket-events.constants.ts` (source de vérité)
+2. Copier la modification dans `front/src/lib/socket/socket-events.constants.ts`
+3. `npm run check:socket-sync` → doit afficher ✅
+4. Inclure les 2 fichiers dans le même commit
 
-export const BREAK_EVENTS = {
-  PROMPT:           'break:prompt',
-  PROMPT_CLEAR:     'break:prompt_clear',
-  DISCONNECT_ALERT: 'break:disconnect_alert',
-} as const;
-```
+**Effort :** 0.5 jour
 
-**Effort :** 2 jours
+**Livré le 2026-07-01 :**
+- `scripts/check-socket-events-sync.js` créé (hash SHA-256, normalisation commentaires + whitespace)
+- `package.json` racine : scripts `check:socket-sync` et `test:all` ajoutés
+- Validé : `npm run check:socket-sync` → ✅ synchronisé
 
 ---
 
@@ -354,70 +387,37 @@ export const BREAK_EVENTS = {
 
 | # | Régression | Impact | Probabilité |
 |---|---|---|---|
-| R2.1a | Un event est renommé dans le package mais l'ancien nom est encore utilisé côté front → les events ne sont plus reçus | Frontend sourd aux events backend — pas d'erreur visible, juste silencieux | **Critique** |
-| R2.1b | Le package n'est pas buildé avant le déploiement backend → `import` échoue au démarrage | Backend ne démarre pas | Élevée |
-| R2.1c | Les anciens fichiers `socket-events.constants.ts` sont supprimés avant la migration complète | Imports cassés à mi-chemin | Moyenne |
-| R2.1d | Incohérence de version entre backend (1.0.0) et front (ancienne copie) pendant la transition | Front et backend ne parlent plus le même protocole | Élevée |
+| R2.1a | Un event est renommé dans le backend mais pas dans le front → les events ne sont plus reçus | Frontend sourd aux events backend — pas d'erreur visible, juste silencieux | **Critique** |
+| R2.1b | Le script CI n'est pas exécuté dans le workflow → la divergence passe inaperçue | Retour au problème initial | Faible (si CI bien configuré) |
 
-**Prévention — Stratégie de migration en 3 étapes OBLIGATOIRES :**
-
-**Étape 1 — Créer le package SANS supprimer les anciens fichiers**
-```typescript
-// front/src/lib/socket/socket-events.constants.ts
-// NE PAS SUPPRIMER — ré-exporter depuis le package pour compatibilité descendante
-export { CHAT_EVENTS, BREAK_EVENTS } from '@whatsapp/socket-contracts';
-```
-
-**Étape 2 — Migrer progressivement les imports (un module à la fois)**
-```bash
-# Vérifier qu'aucun import direct de l'ancien fichier ne reste
-grep -r "socket-events.constants" front/src/ --include="*.ts" --include="*.tsx"
-# Résultat vide = migration complète côté front
-```
-
-**Étape 3 — Supprimer les anciens fichiers SEULEMENT quand grep retourne 0 résultat**
-
-**Tests de non-régression obligatoires avant merge :**
-```typescript
-// packages/socket-contracts/__tests__/events.spec.ts
-import { CHAT_EVENTS, BREAK_EVENTS } from '../src';
-
-describe('socket-contracts — contrat d\'events', () => {
-  it('CHAT_EVENTS conserve tous les events historiques', () => {
-    expect(CHAT_EVENTS.CONVERSATION_LIST).toBe('CONVERSATION_LIST');
-    expect(CHAT_EVENTS.MESSAGE_ADD).toBe('MESSAGE_ADD');
-    // ... tester TOUS les events existants — ce test protège contre le renommage accidentel
-  });
-
-  it('BREAK_EVENTS conserve les noms de pause', () => {
-    expect(BREAK_EVENTS.PROMPT).toBe('break:prompt');
-    expect(BREAK_EVENTS.PROMPT_CLEAR).toBe('break:prompt_clear');
-  });
-});
-```
+**Prévention :**
+- Ajouter `check:socket-sync` comme étape obligatoire du workflow CI avant le build
+- Les commentaires dans les deux fichiers indiquent déjà : "ces deux fichiers DOIVENT rester identiques"
 
 **Rollback :**
-- Le package est additionnel — supprimer l'import dans `tsconfig` suffit
-- Les anciens fichiers ayant été conservés (Étape 1), aucun code ne casse
+- Le script est non-invasif — le supprimer ne casse rien
 
 **Smoke test post-déploiement :**
-- [ ] Un commercial reçoit bien un nouveau message en temps réel (event `MESSAGE_ADD` OK) ✅
-- [ ] Le prompt de pause s'affiche (`break:prompt` reçu) ✅
-- [ ] `npm run build` passe sur backend et front ✅
+- [ ] `npm run check:socket-sync` retourne ✅
+- [ ] Un commercial reçoit bien un message en temps réel (event `MESSAGE_ADD` OK)
+- [ ] Le prompt de pause s'affiche (`break:prompt` reçu)
 
 ---
 
-### 2.2 Pagination keyset uniforme
+### 2.2 Pagination keyset uniforme ✅
 
 **Règle :** tout endpoint de liste utilise :
 ```
-GET /resource?before={cursor}&limit={n}
+GET /resource?cursor={cursor}&limit={n}
 → { data: [], nextCursor: string | null, hasMore: boolean }
 ```
 
-**Endpoints à auditer avant migration :**
-- `GET /contacts` — à vérifier
-- `GET /audit-logs` — à vérifier
+**Réalisé :**
+- `GET /contact` — keyset implémenté (`contact.service.ts::findAllKeyset`, curseur compound `{at, id}` base64url)
+- `admin/src/app/lib/api.ts` — `getClients(limit, cursor?, search?)` + `getClientsOffset` (export compat)
+- `admin/src/app/ui/ClientsView.tsx` — remplace `<Pagination>` par nav prev/next avec pile de curseurs
+- `admin/src/app/lib/exportService.ts` — migré vers `getClientsOffset`
+- `GET /audit-logs` — à faire si nécessaire (volume faible, offset OK pour l'instant)
 
 **Effort :** 1 jour
 

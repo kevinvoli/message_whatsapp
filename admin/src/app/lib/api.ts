@@ -329,7 +329,21 @@ export async function updateBusinessHoursDay(
     return handleResponse<BusinessHoursConfig>(response);
 }
 
-export async function getClients(limit = 50, offset = 0, search?: string): Promise<{ data: Client[]; total: number }> {
+export async function getClients(
+    limit = 50,
+    cursor?: string,
+    search?: string,
+): Promise<{ data: Client[]; nextCursor: string | null; hasMore: boolean }> {
+    const params = new URLSearchParams({ limit: String(limit), cursor: cursor ?? '' });
+    if (search?.trim()) params.set('search', search.trim());
+    const response = await fetch(`${API_BASE_URL}/contact?${params.toString()}`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+    return handleResponse<{ data: Client[]; nextCursor: string | null; hasMore: boolean }>(response);
+}
+
+export async function getClientsOffset(limit = 50, offset = 0, search?: string): Promise<{ data: Client[]; total: number }> {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (search?.trim()) params.set('search', search.trim());
     const response = await fetch(`${API_BASE_URL}/contact?${params.toString()}`, {
