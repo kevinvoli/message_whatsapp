@@ -19,8 +19,6 @@ import { logger } from '@/lib/logger';
 import ConversationRestrictionModal from '@/components/ConversationRestrictionModal';
 import MediaPanel from '@/components/panel/MediaPanel';
 import { getPanelMedia } from '@/lib/api';
-import { useBreakPrompt } from '@/hooks/useBreakPrompt';
-import BreakPromptModal from '@/components/break/BreakPromptModal';
 import { PlanningBadgeJour } from '@/components/planning/PlanningBadgeJour';
 import { PlanningVueCommercial } from '@/components/planning/PlanningVueCommercial';
 
@@ -59,12 +57,7 @@ const WhatsAppPageContent = () => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelEnabled, setPanelEnabled] = useState(false);
   const [viewingPdf, setViewingPdf] = useState<QuizPdf | null>(null);
-  const { prompt: breakPromptReal, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
   const [showPlanning, setShowPlanning] = useState(false);
-  const testBreak = searchParams.get('testBreak') === '1';
-  const breakPrompt = testBreak
-    ? { breakScheduleId: 'test', subGroupName: 'Test sous-groupe', endTime: '23:59', messageText: "C'est l'heure de ta pause !", audioUrl: null, reminderIntervalMinutes: 5, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() }
-    : breakPromptReal;
 
   useEffect(() => {
     getPanelMedia(1, 1)
@@ -194,9 +187,8 @@ const WhatsAppPageContent = () => {
       )}
 
       <ConversationRestrictionModal />
-      <BreakPromptModal prompt={breakPrompt} audioRef={breakAudioRef} onTakeBreak={handleTakeBreak} />
 
-      {/* Bouton Mon planning — coin inférieur gauche, au-dessus de la barre de pause */}
+      {/* Bouton Mon planning — coin inférieur gauche */}
       <button
         onClick={() => setShowPlanning(true)}
         className="fixed bottom-4 left-4 z-30 bg-white border border-gray-200 shadow-md rounded-full px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors flex items-center gap-1.5"

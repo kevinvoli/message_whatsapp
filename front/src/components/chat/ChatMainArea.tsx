@@ -7,6 +7,7 @@ import { PanelTop } from 'lucide-react';
 import { useChatStore } from "@/store/chatStore";
 import { Phone } from "lucide-react";
 import { useEffect } from "react";
+import { useBreakPrompt } from "@/hooks/useBreakPrompt";
 
 interface ChatMainAreaProps {
   panelEnabled?: boolean;
@@ -29,11 +30,10 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
     setSendError,
   } = useChatStore();
 
+  const { prompt: breakPrompt, audioRef: breakAudioRef, handleTakeBreak } = useBreakPrompt();
+
   const totalMessages = selectedConversation ? messages?.length : 0;
 
-  // Fenêtre de messagerie : le backend expose window_expires_at (date d'expiration
-  // faisant autorité, 24h normal / 72h CTWA déjà calculés côté serveur).
-  // Exception : les canaux dédiés à un poste ne sont pas soumis à cette restriction.
   const windowExpiresAt = selectedConversation?.window_expires_at;
   const windowExpired =
     selectedConversation != null &&
@@ -41,11 +41,9 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
     windowExpiresAt != null &&
     new Date(windowExpiresAt).getTime() <= Date.now();
 
-  // Conversation sans canal résolvable → l'envoi est impossible côté backend
   const noChannel =
     selectedConversation != null && selectedConversation.source === 'inconnu';
 
-  // Auto-effacer le sendError après 5 secondes
   useEffect(() => {
     if (!sendError) return;
     const timer = setTimeout(() => setSendError(null), 5000);
@@ -54,17 +52,35 @@ export default function ChatMainArea({ panelEnabled, panelOpen, onTogglePanel }:
 
   return (
     <div className="flex-1 flex flex-col">
-      {panelEnabled && (
-        <div className="flex justify-end border-b border-gray-100 bg-white px-3 py-1.5">
+      <audio ref={breakAudioRef} className="hidden" />
+
+      <div className="flex items-center justify-between border-b border-gray-100 bg-white px-3 py-1.5 shrink-0 min-h-[32px]">
+        <div className="flex-1 min-w-0">
+          {breakPrompt && (
+            <div className="flex items-center gap-2">
+              <span className="text-orange-600 text-xs font-medium leading-none truncate">
+                Pause — {breakPrompt.subGroupName} — fin à {breakPrompt.endTime}
+              </span>
+              <button
+                onClick={handleTakeBreak}
+                className="text-orange-500 text-xs leading-none shrink-0 hover:underline whitespace-nowrap"
+              >
+                Prendre
+              </button>
+            </div>
+          )}
+        </div>
+        {panelEnabled && (
           <button
             onClick={onTogglePanel}
             title="Panneau médias"
-            className={`p-1.5 rounded-lg transition-colors ${panelOpen ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
+            className={`ml-2 p-1.5 rounded-lg transition-colors shrink-0 ${panelOpen ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
           >
             <PanelTop className="w-5 h-5" />
           </button>
-        </div>
-      )}
+        )}
+      </div>
+
       {selectedConversation ? (
         <>
           {isLoading ? (
