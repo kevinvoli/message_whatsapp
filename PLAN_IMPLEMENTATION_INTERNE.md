@@ -15,6 +15,12 @@ R4. Zéro `any` TypeScript — bloquant en PR review
 R5. Zéro requête SQL dans une boucle — utiliser IN (:...ids) ou jointures
 R6. Tout endpoint exposé publiquement doit être rate-limité
 R7. Les constantes Socket.IO ne sont jamais dupliquées — shared package uniquement
+R8. Tout élément scrollable dans une flex column doit porter `min-h-0`
+    → Pattern obligatoire : `flex-1 min-h-0 overflow-y-auto`
+    → Tout conteneur flex intermédiaire dans la même chaîne doit aussi avoir `min-h-0`
+    → Sans `min-h-0`, `min-height: auto` (valeur par défaut CSS) empêche le shrink
+       et bypasse silencieusement overflow-hidden du parent — le contenu déborde
+       sans aucun message d'erreur visible
 ```
 
 ## Points d'excellence à préserver
@@ -46,9 +52,9 @@ Ne jamais déployer directement sur `production` sans validation staging.
 
 ---
 
-## Phase 1 — Tooling qualité (Jalon J1)
+## Phase 1 — Tooling qualité (Jalon J1) ✅ COMPLÈTE — 2026-07-01
 
-### 1.1 Prettier + lint-staged + Husky
+### 1.1 Prettier + lint-staged + Husky ✅
 
 **Objectif :** standardiser le style de code, bloquer les commits non conformes.
 
@@ -80,6 +86,15 @@ npx husky add .husky/pre-commit "npx lint-staged"
 ```
 
 **Effort :** 0.5 jour
+
+**Livré le 2026-07-01 :**
+- `.prettierrc.json` créé sur `front/` et `admin/`
+- `.prettierrc` mis à jour sur `message_whatsapp/` (ajout `semi`, `printWidth`, `tabWidth`)
+- `.prettierignore` créé sur les 3 projets
+- `eslint.config.mjs` mis à jour sur `front/` et `admin/` (ajout `eslintConfigPrettier` en dernier)
+- `package.json` mis à jour sur les 3 projets (`lint-staged` config + `prepare: husky`)
+- `.husky/pre-commit` créé sur les 3 projets
+- `npm install` terminé sur les 3 projets (exit code 0)
 
 ---
 
@@ -134,7 +149,7 @@ rm .husky/pre-commit
 
 ---
 
-### 1.2 Vitest — Setup initial frontend
+### 1.2 Vitest — Setup initial frontend ✅
 
 **Installation dans `front/` :**
 ```bash
@@ -169,6 +184,12 @@ export default defineConfig({
 ```
 
 **Effort :** 1 jour
+
+**Livré le 2026-07-01 :**
+- `front/vitest.config.ts` créé (jsdom, globals, alias `@`, setupFiles)
+- `front/src/test/setup.ts` créé (mocks leaflet, react-leaflet, socket.io-client)
+- `@testing-library/dom` ajouté (peer dep manquante de @testing-library/react v16)
+- Scripts `test`, `test:watch`, `test:coverage` ajoutés à `front/package.json`
 
 ---
 
@@ -237,7 +258,7 @@ rm vitest.config.ts src/test/setup.ts
 
 ---
 
-### 1.3 Tests prioritaires — Hooks critiques (R1 + R2)
+### 1.3 Tests prioritaires — Hooks critiques (R1 + R2) ✅
 
 **Ordre de priorité :**
 
@@ -249,6 +270,12 @@ rm vitest.config.ts src/test/setup.ts
 | `chatStore` (Zustand) | `store/chatStore.spec.ts` | selectConversation change l'état, filterStatus filtre correctement |
 
 **Effort :** 3 jours
+
+**Livré le 2026-07-01 — 24 tests verts, 0 échec :**
+- `front/src/hooks/useBreakPrompt.spec.ts` — 4 tests (prompt null, handleTakeBreak sans/avec prompt, clear event)
+- `front/src/hooks/usePlanningCommercial.spec.ts` — 7 tests (loading, null, error, entry, mois loading, mois fetch, mois race condition)
+- `front/src/hooks/useIdleTimer.spec.ts` — 5 tests (idleMinutes=0, showWarning, resetActivity, redirect, cleanup unmount)
+- `front/src/store/chatStore.spec.ts` — 8 tests (état initial ×4, setTotalUnread, setSendError ×2, reset)
 
 ---
 
@@ -859,4 +886,10 @@ const safePayload = sanitizeObject(payload, ['token', 'webhook_secret', 'meta_ap
 □ Nouveau service backend → fichier .spec.ts créé (R1)
 □ assertWhapiSecret() / assertMetaSignature() non commentés (E1)
 □ Workflow CI non modifié (E3)
+
+— Layout (R8) —
+□ Tout nouveau composant scrollable dans une flex column → `min-h-0` présent sur lui-même
+□ Tout nouveau conteneur flex intermédiaire entre la racine et un scrollable → `min-h-0` présent
+□ Scroller manuellement une liste longue dans le navigateur avant de valider une PR UI
+□ Vérifier que la page entière ne scroll pas (seul le composant interne doit scroller)
 ```

@@ -19,6 +19,7 @@ Elles constituent des critères de sortie (Definition of Done) pour chaque livra
 | R5 | Zéro requête SQL dans une boucle — utiliser `IN (:...ids)` ou jointures | PR review |
 | R6 | Tout endpoint exposé publiquement doit être rate-limité | PR review |
 | R7 | Les constantes Socket.IO ne sont jamais dupliquées — shared package uniquement | PR review |
+| R8 | Tout élément scrollable dans une flex column doit avoir `min-h-0` (lui-même + tous les conteneurs flex intermédiaires dans la chaîne). Pattern : `flex-1 min-h-0 overflow-y-auto` | PR review |
 
 ## Points d'excellence à préserver à chaque jalon
 
@@ -53,12 +54,14 @@ Aucune nouvelle feature n'est livrable sans ces fondations.
 
 **Date cible :** ~2026-07-15
 
+**Avancement :** Phase 1 ✅ livrée le 2026-07-01
+
 ### Critères de sortie (Definition of Done)
 
-- [ ] Prettier configuré sur les 3 projets (`front/`, `admin/`, `message_whatsapp/`)
-- [ ] lint-staged + Husky actif : tout commit passe ESLint + Prettier automatiquement
-- [ ] Vitest configuré dans `front/` (commande `npm test` fonctionnelle)
-- [ ] ≥ 4 tests de hooks critiques écrits et passants : `useBreakPrompt`, `usePlanningCommercial`, `useIdleTimer`, `chatStore`
+- [x] Prettier configuré sur les 3 projets (`front/`, `admin/`, `message_whatsapp/`)
+- [x] lint-staged + Husky actif : tout commit passe ESLint + Prettier automatiquement
+- [x] Vitest configuré dans `front/` (commande `npm test` fonctionnelle)
+- [x] ≥ 4 tests de hooks critiques écrits et passants : `useBreakPrompt`, `usePlanningCommercial`, `useIdleTimer`, `chatStore` — **24 tests verts**
 - [ ] CI GitHub Actions exécute `npm test` sur le front et bloque si un test échoue
 
 ### Critères de non-régression J1
@@ -68,6 +71,7 @@ Aucune nouvelle feature n'est livrable sans ces fondations.
 - [ ] Aucun test n'appelle l'API réelle (tous les appels HTTP sont mockés) ✅
 - [ ] Les tests sont isolés : l'ordre d'exécution n'affecte pas les résultats ✅
 - [ ] Un commit avec une faute de style est bloqué par Husky ✅
+- [ ] Scroller manuellement une liste de messages longue → seul le composant interne scrolle, pas la page (R8) ✅
 
 ### Livrables
 
