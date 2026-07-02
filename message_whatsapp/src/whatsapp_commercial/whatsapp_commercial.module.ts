@@ -12,6 +12,7 @@ import { WhapiChannel } from 'src/channel/entities/channel.entity';
 import { CommercialStatsService } from './commercial-stats.service';
 import { ConnectionLogModule } from 'src/connection-log/connection-log.module';
 import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.module';
+import { AdminAuditModule } from 'src/admin-audit/admin-audit.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { WhatsappMessageModule } from 'src/whatsapp_message/whatsapp_message.mod
     ]),
     ConnectionLogModule,
     forwardRef(() => WhatsappMessageModule),
+    AdminAuditModule,
   ],
   controllers: [WhatsappCommercialController],
   providers: [WhatsappCommercialService, QueueService, CommercialStatsService],

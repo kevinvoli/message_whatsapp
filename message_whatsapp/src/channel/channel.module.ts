@@ -12,12 +12,14 @@ import { CommunicationTelegramService } from 'src/communication_whapi/communicat
 import { WhatsappChat } from 'src/whatsapp_chat/entities/whatsapp_chat.entity';
 import { LoggingModule } from 'src/logging/logging.module';
 import { JorbsModule } from 'src/jorbs/jorbs.module';
+import { AdminAuditModule } from 'src/admin-audit/admin-audit.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WhapiChannel, ProviderChannel, WhatsappChat, WhatsappPoste, DispatchSettings]),
     LoggingModule,
     JorbsModule,
+    AdminAuditModule,
   ],
   controllers: [ChannelController],
   providers: [ChannelService, CommunicationWhapiService, CommunicationTelegramService, MetaTokenService],

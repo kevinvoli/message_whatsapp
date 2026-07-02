@@ -9,6 +9,7 @@ import {
   UseGuards,
   Logger,
   Query,
+  Req,
 } from '@nestjs/common';
 import { WhatsappCommercialService } from './whatsapp_commercial.service';
 import { CreateWhatsappCommercialDto } from './dto/create-whatsapp_commercial.dto';
@@ -17,6 +18,8 @@ import { AdminGuard } from '../auth/admin.guard';
 import { CommercialStatsService } from './commercial-stats.service';
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
+import { AdminAuditService } from '../admin-audit/admin-audit.service';
+import { AuditLog } from '../admin-audit/audit-log.decorator';
 
 interface DisconnectCommercialResponse {
   disconnected: boolean;
@@ -33,6 +36,7 @@ export class WhatsappCommercialController {
     private readonly commercialStatsService: CommercialStatsService,
     private readonly gateway: WhatsappMessageGateway,
     private readonly connectionLogService: ConnectionLogService,
+    private readonly auditService: AdminAuditService,
   ) {}
 
   @Post()
@@ -99,7 +103,15 @@ export class WhatsappCommercialController {
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
+  @AuditLog({
+    action: 'DELETE_COMMERCIAL',
+    targetEntity: 'WhatsappCommercial',
+    targetIdExtractor: (args) => (typeof args[0] === 'string' ? args[0] : null),
+  })
+  async remove(
+    @Param('id') id: string,
+    @Req() _req: { user: { userId: string } },
+  ) {
     return await this.whatsappCommercialService.remove(id);
   }
 }

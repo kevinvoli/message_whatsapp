@@ -9,6 +9,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ChannelService } from './channel.service';
 import { MetaTokenService } from './meta-token.service';
@@ -16,6 +17,8 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AssignPosteDto } from './dto/assign-poste.dto';
 import { AdminGuard } from '../auth/admin.guard'; // Import AdminGuard
+import { AdminAuditService } from '../admin-audit/admin-audit.service';
+import { AuditLog } from '../admin-audit/audit-log.decorator';
 
 @Controller('channel')
 @UseGuards(AdminGuard) // Use AdminGuard
@@ -25,6 +28,7 @@ export class ChannelController {
   constructor(
     private readonly communicationWhapiService: ChannelService,
     private readonly metaTokenService: MetaTokenService,
+    private readonly auditService: AdminAuditService,
   ) {}
 
   @Post()
@@ -45,9 +49,15 @@ export class ChannelController {
   }
 
   @Patch(':id')
+  @AuditLog({
+    action: 'UPDATE_CHANNEL',
+    targetEntity: 'WhapiChannel',
+    targetIdExtractor: (args) => (typeof args[0] === 'string' ? args[0] : null),
+  })
   update(
     @Param('id') id: string,
     @Body() updateCommunicationWhapiDto: UpdateChannelDto,
+    @Req() _req: { user: { userId: string } },
   ) {
     return this.communicationWhapiService.update(
       id,
@@ -56,7 +66,15 @@ export class ChannelController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
+  @AuditLog({
+    action: 'DELETE_CHANNEL',
+    targetEntity: 'WhapiChannel',
+    targetIdExtractor: (args) => (typeof args[0] === 'string' ? args[0] : null),
+  })
+  remove(
+    @Param('id') id: string,
+    @Req() _req: { user: { userId: string } },
+  ) {
     return this.communicationWhapiService.remove(id);
   }
 

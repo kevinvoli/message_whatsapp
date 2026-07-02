@@ -48,6 +48,7 @@ import { CommercialGroupModule } from './commercial-group/commercial-group.modul
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthModule } from './health/health.module';
+import { AdminAuditModule } from './admin-audit/admin-audit.module';
 
 @Module({
   imports: [
@@ -137,6 +138,7 @@ import { HealthModule } from './health/health.module';
     QuizModule,
     CommercialGroupModule,
     HealthModule,
+    AdminAuditModule,
   ],
   controllers: [AppController],
   providers: [AppService, TasksService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
