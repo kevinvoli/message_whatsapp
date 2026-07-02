@@ -64,7 +64,7 @@ export class AddHotPathIndexes1751600000001 implements MigrationInterface {
   ): Promise<void> {
     if (await this.indexExists(queryRunner, table, indexName)) return;
     await queryRunner.query(
-      `ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${columns}) ALGORITHM=INPLACE, LOCK=NONE`,
+      `ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${columns}), ALGORITHM=INPLACE, LOCK=NONE`,
     );
   }
 
