@@ -11,36 +11,13 @@ import React, {
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { useChatStore } from '@/store/chatStore';
 
-interface Permission {
-  id: string;
-  name: string;
-  description?: string;
-}
-
-interface UserRaw {
-  id: string;
-  email: string;
-  name: string;
-  posteId?: string | null;
-  poste_id: string;
-  isWorkingToday?: boolean;
-  absentToday?: boolean;
-  isReplacing?: boolean;
-  rbacEnabled?: boolean;
-  permissions?: Permission[];
-}
-
 interface User {
   id: string;
   email: string;
   name: string;
   posteId?: string | null;
   poste_id: string;
-  isWorkingToday?: boolean;
-  absentToday?: boolean;
-  isReplacing?: boolean;
-  rbacEnabled: boolean;
-  permissions: string[];
+  tokenVersion?: number;
 }
 
 interface AuthContextType {
@@ -57,12 +34,10 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const normalizeUser = (raw: UserRaw): User => ({
+const normalizeUser = (raw: User): User => ({
   ...raw,
   poste_id: raw.poste_id ?? raw.posteId ?? '',
   posteId: raw.posteId ?? raw.poste_id ?? null,
-  rbacEnabled: raw.rbacEnabled ?? false,
-  permissions: raw.permissions?.map((p) => p.name) ?? [],
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -82,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        const response = await axios.get<UserRaw>(`${apiBaseUrl}/auth/profile`, {
+        const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
           withCredentials: true,
         });
         const userData = normalizeUser(response.data);
@@ -97,30 +72,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     void bootstrapSession();
   }, []);
 
-  // Poll silencieux toutes les 5 min pour détecter les changements de statut en cours de journée
-  // (absence déclarée, remplacement, changement de groupe…)
+  // Poll silencieux toutes les 5 min pour détecter un changement de poste en cours de journée
   useEffect(() => {
     if (!apiBaseUrl) return;
 
     const refreshProfile = async () => {
       try {
-        const response = await axios.get<UserRaw>(`${apiBaseUrl}/auth/profile`, {
+        const response = await axios.get<User>(`${apiBaseUrl}/auth/profile`, {
           withCredentials: true,
         });
         setUser((prev) => {
           if (!prev) return prev;
           const fresh = normalizeUser(response.data);
-          const changed =
-            prev.isWorkingToday !== fresh.isWorkingToday ||
-            prev.absentToday   !== fresh.absentToday    ||
-            prev.isReplacing   !== fresh.isReplacing    ||
-            prev.posteId       !== fresh.posteId        ||
-            prev.rbacEnabled   !== fresh.rbacEnabled    ||
-            prev.permissions.join(',') !== fresh.permissions.join(',');
-          return changed ? fresh : prev;
+          return fresh.posteId !== prev.posteId ? fresh : prev;
         });
       } catch {
-        // silencieux — si la session expire, le prochain 401 sur une vraie requête gère la déconnexion
+        // silencieux — le prochain 401 sur une vraie requête gère la déconnexion
       }
     };
 
@@ -196,29 +163,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     setError(null);
 
-    // 4.10 — Obtenir la position GPS avant d'envoyer le login
-    let latitude: number | undefined;
-    let longitude: number | undefined;
-    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-      try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 8000,
-            maximumAge: 60_000,
-          }),
-        );
-        latitude = pos.coords.latitude;
-        longitude = pos.coords.longitude;
-      } catch {
-        // Géoloc refusée ou indisponible — on tente quand même le login.
-        // Si une restriction est configurée côté backend, il renverra une 403.
-      }
-    }
-
     try {
-      const response = await axios.post<{ user: UserRaw; accessToken: string }>(
+      const response = await axios.post<{ user: User; accessToken: string }>(
         `${apiBaseUrl}/auth/login`,
-        { email, password, latitude, longitude },
+        { email, password },
         { withCredentials: true },
       );
 
@@ -232,7 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (status === 403) {
           errorMessage =
             err.response?.data?.message ||
-            'Connexion refusée : vous ne vous trouvez pas dans une zone autorisée. Activez la localisation et réessayez.';
+            'Connexion refusée.';
         } else {
           errorMessage = err.response?.data?.message || 'Login failed';
         }
