@@ -26,8 +26,12 @@
         "prepare": "node -e \"if(require('fs').existsSync('.git')){require('child_process').execSync('husky',{stdio:'inherit'})}\" || true"
     },
     "lint-staged": {
-        "*.{ts}": ["prettier --write"],
-        "*.{json,md}": ["prettier --write"]
+        "*.{ts}": [
+            "prettier --write"
+        ],
+        "*.{json,md}": [
+            "prettier --write"
+        ]
     },
     "dependencies": {
         "@nestjs/common": "^11.0.1",
@@ -41,6 +45,8 @@
         "@nestjs/platform-socket.io": "^11.1.11",
         "@nestjs/schedule": "^6.1.0",
         "@nestjs/swagger": "^11.2.4",
+        "@nestjs/terminus": "^11.1.1",
+        "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.0",
         "@nestjs/websockets": "^11.1.11",
         "async-mutex": "^0.5.0",

@@ -45,6 +45,9 @@ import { MediaStorageModule } from './media-storage/media-storage.module';
 import { MessageRestrictionModule } from './message-restriction/message-restriction.module';
 import { QuizModule } from './quiz/quiz.module';
 import { CommercialGroupModule } from './commercial-group/commercial-group.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -53,6 +56,11 @@ import { CommercialGroupModule } from './commercial-group/commercial-group.modul
       WhapiChannel,
       WhatsappChat,
       Admin,
+    ]),
+    ThrottlerModule.forRoot([
+      { name: 'short',  ttl: 1_000,  limit: 20  },
+      { name: 'medium', ttl: 10_000, limit: 50  },
+      { name: 'long',   ttl: 60_000, limit: 200 },
     ]),
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
@@ -128,8 +136,9 @@ import { CommercialGroupModule } from './commercial-group/commercial-group.modul
     MessageRestrictionModule,
     QuizModule,
     CommercialGroupModule,
+    HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService, TasksService],
+  providers: [AppService, TasksService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

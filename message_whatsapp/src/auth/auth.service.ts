@@ -1,10 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { createHash } from 'crypto';
 import { WhatsappCommercialService } from '../whatsapp_commercial/whatsapp_commercial.service';
 import { WhatsappCommercial } from '../whatsapp_commercial/entities/user.entity';
 import { AuthUser } from './shared/base-auth-user.types';
 import { BaseAuthService, UserLookupService } from './shared/base-auth.service';
 import { SystemConfigService } from '../system-config/system-config.service';
+import { RefreshToken } from './entities/refresh-token.entity';
 
 @Injectable()
 export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
@@ -12,6 +16,8 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
     private readonly usersService: WhatsappCommercialService,
     private readonly systemConfig: SystemConfigService,
     jwtService: JwtService,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
   ) {
     super(jwtService, { accessTokenExpiry: '7d', refreshTokenExpiry: '7d' });
   }
@@ -61,6 +67,35 @@ export class AuthService extends BaseAuthService<AuthUser, WhatsappCommercial> {
       posteId: user.posteId,
       tokenVersion: user.tokenVersion,
     };
+  }
+
+  async loginAndStoreRefresh(user: AuthUser): Promise<{ accessToken: string; refreshToken: string }> {
+    const payload = this.buildPayload(user);
+
+    const accessExpiry =
+      process.env.FF_SHORT_JWT_EXPIRY === 'true'
+        ? '15m'
+        : this.tokenConfig.accessTokenExpiry;
+
+    const accessToken = this.jwtService.sign(payload, { expiresIn: accessExpiry } as JwtSignOptions);
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: this.tokenConfig.refreshTokenExpiry,
+    } as JwtSignOptions);
+
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await this.refreshTokenRepo.save(
+      this.refreshTokenRepo.create({ tokenHash, commercialId: user.id, expiresAt, revokedAt: null }),
+    );
+
+    return { accessToken, refreshToken };
+  }
+
+  async findUserById(userId: string): Promise<AuthUser | null> {
+    const user = await this.usersService.findOneWithPoste(userId);
+    if (!user) return null;
+    return this.toAuthUser(user as WhatsappCommercial);
   }
 
   async getProfile(userId: string): Promise<AuthUser | null> {

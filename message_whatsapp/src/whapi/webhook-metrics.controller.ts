@@ -1,7 +1,9 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { WebhookMetricsService } from './webhook-metrics.service';
 import { ChannelService } from 'src/channel/channel.service';
 
+@SkipThrottle()
 @Controller('metrics/webhook')
 export class WebhookMetricsController {
   constructor(

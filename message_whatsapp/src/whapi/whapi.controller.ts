@@ -13,6 +13,7 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { WhapiService } from './whapi.service';
@@ -31,6 +32,8 @@ import { WhatsappTemplateService } from 'src/whatsapp_template/whatsapp_template
 import { WhatsappMessageGateway } from 'src/whatsapp_message/whatsapp_message.gateway';
 import { json } from 'stream/consumers';
 
+// Les webhooks reçoivent un volume légitime élevé — exemptés du throttler global
+@SkipThrottle()
 @Controller('webhooks')
 export class WhapiController {
   private readonly auditLogger = new Logger('WebhookAudit');

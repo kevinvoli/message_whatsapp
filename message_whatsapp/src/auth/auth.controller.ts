@@ -12,13 +12,19 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto } from './shared/login.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { Response } from 'express';
+import { Response, Request as ExpressRequest } from 'express';
+import { createHash } from 'crypto';
+import { IsNull, MoreThan, Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { RefreshToken } from './entities/refresh-token.entity';
+import { JwtCommercialPayload } from './shared/base-auth-user.types';
+import { Throttle } from '@nestjs/throttler';
 import { ConnectionLogService } from 'src/connection-log/connection-log.service';
 import { CommercialStatsService } from 'src/whatsapp_commercial/commercial-stats.service';
 import { WhatsappCommercialService } from 'src/whatsapp_commercial/whatsapp_commercial.service';
 import { DispatchSettingsService } from 'src/dispatcher/services/dispatch-settings.service';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { WhapiChannel } from 'src/channel/entities/channel.entity';
 
 @Controller('auth')
@@ -29,10 +35,15 @@ export class AuthController {
     private readonly commercialStatsService: CommercialStatsService,
     private readonly dispatchSettingsService: DispatchSettingsService,
     private readonly commercialService: WhatsappCommercialService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     @InjectRepository(WhapiChannel)
     private readonly channelRepository: Repository<WhapiChannel>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
   ) {}
 
+  @Throttle({ short: { limit: 10, ttl: 60_000 } })
   @Post('login')
   async login(
     @Body() loginDto: LoginDto,
@@ -47,9 +58,8 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const { accessToken, refreshToken } = this.authService.login(user);
+    const { accessToken, refreshToken } = await this.authService.loginAndStoreRefresh(user);
 
-    // Log connexion commercial
     void this.connectionLogService.logLogin(user.id, 'commercial');
 
     res.cookie('Authentication', accessToken, {
@@ -67,6 +77,62 @@ export class AuthController {
     });
 
     return { user, accessToken };
+  }
+
+  @Throttle({ short: { limit: 5, ttl: 60_000 } })
+  @Post('refresh')
+  async refresh(
+    @Request() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const rawToken = req.cookies?.['Refresh'] as string | undefined;
+    if (!rawToken) {
+      throw new UnauthorizedException('Refresh token manquant');
+    }
+
+    let payload: JwtCommercialPayload;
+    try {
+      payload = this.jwtService.verify<JwtCommercialPayload>(rawToken, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Refresh token invalide ou expiré');
+    }
+
+    const hash = createHash('sha256').update(rawToken).digest('hex');
+    const tokenRecord = await this.refreshTokenRepo.findOne({
+      where: { tokenHash: hash, revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Refresh token révoqué ou expiré');
+    }
+
+    tokenRecord.revokedAt = new Date();
+    await this.refreshTokenRepo.save(tokenRecord);
+
+    const user = await this.authService.findUserById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('Utilisateur introuvable');
+    }
+
+    const { accessToken, refreshToken } = await this.authService.loginAndStoreRefresh(user);
+
+    res.cookie('Authentication', accessToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    res.cookie('Refresh', refreshToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    return { ok: true };
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -111,11 +177,20 @@ export class AuthController {
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
   async logout(
-    @Request() req,
+    @Request() req: ExpressRequest & { user: { userId: string } },
     @Res({ passthrough: true }) res: Response,
   ) {
     void this.connectionLogService.logLogout(req.user.userId, 'commercial');
     void this.commercialService.incrementTokenVersion(req.user.userId).catch(() => {});
+
+    const rawToken = req.cookies?.['Refresh'] as string | undefined;
+    if (rawToken) {
+      const hash = createHash('sha256').update(rawToken).digest('hex');
+      void this.refreshTokenRepo.update(
+        { tokenHash: hash, revokedAt: IsNull() },
+        { revokedAt: new Date() },
+      ).catch(() => {});
+    }
 
     res.clearCookie('Authentication');
     res.clearCookie('Refresh');

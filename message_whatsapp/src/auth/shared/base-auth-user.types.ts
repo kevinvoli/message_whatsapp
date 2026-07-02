@@ -10,3 +10,13 @@ export type AuthUser = BaseAuthUser & {
 };
 
 export type AuthAdminUser = BaseAuthUser;
+
+export type JwtCommercialPayload = {
+  sub: string;
+  email: string;
+  name: string;
+  posteId?: string | null;
+  tokenVersion: number;
+  iat: number;
+  exp: number;
+};
