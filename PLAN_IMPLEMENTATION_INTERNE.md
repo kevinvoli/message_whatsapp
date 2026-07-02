@@ -853,18 +853,18 @@ const safePayload = sanitizeObject(payload, ['token', 'webhook_secret', 'meta_ap
 
 ## Récapitulatif — Tableau de bord
 
-| Phase | Tâche | Effort | Criticité | Jalon | Risques critiques identifiés |
-|---|---|---|---|---|---|
-| 1.1 | Prettier + Husky | 0.5j | P1 | J1 | Conflit ESLint (R1.1a) |
-| 1.2 | Vitest setup | 1j | P0 | J1 | Modules browser-only (R1.2a), appels API réels (R1.2b) |
-| 1.3 | Tests hooks (×4) | 3j | P0 | J1 | États partagés entre tests (R1.3c) |
-| 2.1 | Package socket-contracts | 2j | P1 | J2 | Renommage silencieux d'events (R2.1a) |
-| 2.2 | Pagination keyset | 1j | P2 | J2 | Paramètres anciens non migrés (R2.2a) |
-| 3.1 | Refresh token | 2j | P0 | J2 | Déconnexion massive au déploiement (R3.1a/b) |
-| 3.2 | Rate-limiting | 1j | P1 | J2 | Webhooks throttlés (R3.2a) |
-| 3.3 | Health endpoint | 1j | P1 | J2 | Fuite d'info (R3.3a) |
-| 4.1 | Index MySQL | 2j | P1 | J3 | Lock table en production (R4.1a) |
-| 4.2 | Correction N+1 | 1j | P0 | J3 | OOM par jointure trop large (R4.2a) |
+| Phase | Tâche | Effort | Criticité | Jalon | Risques critiques identifiés | Statut |
+|---|---|---|---|---|---|---|
+| 1.1 | Prettier + Husky | 0.5j | P1 | J1 | Conflit ESLint (R1.1a) | |
+| 1.2 | Vitest setup | 1j | P0 | J1 | Modules browser-only (R1.2a), appels API réels (R1.2b) | |
+| 1.3 | Tests hooks (×4) | 3j | P0 | J1 | États partagés entre tests (R1.3c) | |
+| 2.1 | Package socket-contracts | 2j | P1 | J2 | Renommage silencieux d'events (R2.1a) | |
+| 2.2 | Pagination keyset | 1j | P2 | J2 | Paramètres anciens non migrés (R2.2a) | |
+| 3.1 | Refresh token | 2j | P0 | J2 | Déconnexion massive au déploiement (R3.1a/b) | |
+| 3.2 | Rate-limiting | 1j | P1 | J2 | Webhooks throttlés (R3.2a) | |
+| 3.3 | Health endpoint | 1j | P1 | J2 | Fuite d'info (R3.3a) | |
+| 4.1 | Index MySQL | 2j | P1 | J3 | Lock table en production (R4.1a) | ✅ |
+| 4.2 | Correction N+1 | 1j | P0 | J3 | OOM par jointure trop large (R4.2a) | ✅ |
 | 5.1 | MySQL docker local | 0.5j | P2 | J3 | Conflit port 3306 (R5.1a) |
 | 5.2 | Audit trail admin | 2j | P2 | J3 | Secrets dans l'audit log (R5.2b) |
 | **Total** | | **~17j** | | | |
