@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { useChatStore } from '@/store/chatStore';
 
 interface Permission {
@@ -156,7 +156,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!axios.isAxiosError(error)) return Promise.reject(error);
 
         const originalRequest = error.config as
-          | (axios.InternalAxiosRequestConfig & { _retry?: boolean })
+          | (InternalAxiosRequestConfig & { _retry?: boolean })
           | undefined;
 
         if (
