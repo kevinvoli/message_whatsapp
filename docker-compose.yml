@@ -4,6 +4,7 @@
 volumes:
   backend_uploads:   # fichiers médias WhatsApp
   backend_logs:      # logs applicatifs NestJS
+  redis_data:        # persistance Redis (BullMQ)
 
 # ──────────────────────────────────────────────────────────────
 # RÉSEAU interne entre les containers
@@ -13,6 +14,25 @@ networks:
     driver: bridge
 
 services:
+
+  # ────────────────────────────────
+  # REDIS — BullMQ (port 6379 interne)
+  # ────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: whatsapp-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - whatsapp-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ────────────────────────────────
   # BACKEND — NestJS (port 3002)
@@ -30,6 +50,9 @@ services:
       - backend_logs:/app/logs
     networks:
       - whatsapp-net
+    depends_on:
+      redis:
+        condition: service_healthy
     # Accès à MySQL installé directement sur le serveur host
     extra_hosts:
       - "host.docker.internal:host-gateway"

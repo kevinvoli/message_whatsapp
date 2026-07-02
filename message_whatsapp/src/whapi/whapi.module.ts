@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
+import { WebhookProducerService } from 'src/webhooks/webhook-producer.service';
+import { WebhookWorkerProcessor } from 'src/webhooks/webhook-worker.processor';
 import { WhapiService } from './whapi.service';
 import { WhapiController } from './whapi.controller';
 // import { WhatsappAgentService } from 'src/whatsapp_agent/whatsapp_agent.service';
@@ -100,8 +103,10 @@ import { MessageRestrictionModule } from 'src/message-restriction/message-restri
     ChatSessionModule,
     MediaStorageModule,
     MessageRestrictionModule,
+    BullModule.registerQueue({ name: 'webhook-inbound' }),
   ],
   controllers: [WhapiController, WebhookMetricsController],
+  exports: [UnifiedIngressService, WebhookDegradedQueueService, WebhookProducerService],
   providers: [
     WhapiService,
     WhatsappMessageService,
@@ -134,6 +139,8 @@ import { MessageRestrictionModule } from 'src/message-restriction/message-restri
     InboundMessageService,
     UnifiedIngressService,
     WebhookIdempotencyService,
+    WebhookProducerService,
+    WebhookWorkerProcessor,
   ],
 })
 export class WhapiModule {}

@@ -47,6 +47,7 @@ import { QuizModule } from './quiz/quiz.module';
 import { CommercialGroupModule } from './commercial-group/commercial-group.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { BullModule } from '@nestjs/bullmq';
 import { HealthModule } from './health/health.module';
 import { AdminAuditModule } from './admin-audit/admin-audit.module';
 
@@ -64,6 +65,13 @@ import { AdminAuditModule } from './admin-audit/admin-audit.module';
       { name: 'long',   ttl: 60_000, limit: 200 },
     ]),
     ScheduleModule.forRoot(),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST ?? 'redis',
+        port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+        password: process.env.REDIS_PASSWORD || undefined,
+      },
+    }),
     ConfigModule.forRoot({
       validationSchema: Joi.object({
         NODE_ENV: Joi.string()

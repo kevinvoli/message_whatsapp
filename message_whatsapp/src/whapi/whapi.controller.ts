@@ -23,6 +23,7 @@ import { MessengerWebhookPayload } from './interface/messenger-webhook.interface
 import { InstagramWebhookPayload } from './interface/instagram-webhook.interface';
 import { TelegramWebhookPayload } from './interface/telegram-webhook.interface';
 import { UnifiedIngressService } from 'src/webhooks/unified-ingress.service';
+import { WebhookProducerService } from 'src/webhooks/webhook-producer.service';
 import { ChannelService } from 'src/channel/channel.service';
 import { WebhookRateLimitService } from './webhook-rate-limit.service';
 import { WebhookTrafficHealthService } from './webhook-traffic-health.service';
@@ -38,6 +39,8 @@ import { json } from 'stream/consumers';
 export class WhapiController {
   private readonly auditLogger = new Logger('WebhookAudit');
 
+  private static readonly FF_BULLMQ = process.env.FF_BULLMQ_WEBHOOK === 'true';
+
   constructor(
     private readonly whapiService: WhapiService,
     private readonly rateLimitService: WebhookRateLimitService,
@@ -45,6 +48,7 @@ export class WhapiController {
     private readonly degradedQueue: WebhookDegradedQueueService,
     private readonly metricsService: WebhookMetricsService,
     private readonly unifiedIngressService: UnifiedIngressService,
+    private readonly webhookProducer: WebhookProducerService,
     private readonly channelService: ChannelService,
     private readonly templateService: WhatsappTemplateService,
     private readonly gateway: WhatsappMessageGateway,
@@ -307,6 +311,17 @@ export class WhapiController {
               HttpStatus.SERVICE_UNAVAILABLE,
             );
           }
+        } else if (WhapiController.FF_BULLMQ) {
+          void this.webhookProducer.enqueueIngestion(
+            'messenger',
+            singleEntryPayload,
+            `${requestId}-${String(entryPageId)}`,
+            { provider: 'messenger', tenantId, channelId: entryChannelId },
+          ).catch((err: Error) => {
+            this.auditLogger.error(
+              `BULLMQ_ENQUEUE_ERROR provider=messenger tenant_id=${tenantId} entry=${entryPageId} error=${err.message}`,
+            );
+          });
         } else {
           // Fire-and-forget : retourner vite à Messenger pour éviter les retries.
           const asyncStartedAt = Date.now();
@@ -401,24 +416,34 @@ export class WhapiController {
       return { status: 'duplicate_ignored' };
     }
 
-    try {
-      await this.unifiedIngressService.ingestTelegram(payload, {
-        provider: 'telegram',
-        tenantId,
-        channelId,
-      });
-    } catch (err) {
-      if (err instanceof HttpException) {
-        this.healthService.record(
-          provider,
-          err.getStatus() < 500,
-          Date.now() - startedAt,
-        );
+    if (WhapiController.FF_BULLMQ) {
+      const eventId = `telegram-${String(payload.update_id ?? randomUUID())}`;
+      await this.webhookProducer.enqueueIngestion(
+        'telegram',
+        payload,
+        eventId,
+        { provider: 'telegram', tenantId, channelId },
+      );
+    } else {
+      try {
+        await this.unifiedIngressService.ingestTelegram(payload, {
+          provider: 'telegram',
+          tenantId,
+          channelId,
+        });
+      } catch (err) {
+        if (err instanceof HttpException) {
+          this.healthService.record(
+            provider,
+            err.getStatus() < 500,
+            Date.now() - startedAt,
+          );
+          throw err;
+        }
+        this.healthService.record(provider, false, Date.now() - startedAt);
+        this.metricsService.recordError(provider, tenantId, 'exception');
         throw err;
       }
-      this.healthService.record(provider, false, Date.now() - startedAt);
-      this.metricsService.recordError(provider, tenantId, 'exception');
-      throw err;
     }
 
     this.healthService.record(provider, true, Date.now() - startedAt);
@@ -542,22 +567,32 @@ export class WhapiController {
     }
 
     this.auditLogger.log(`IG[7/8] calling_ingest tenant_id=${tenantId} channel_id=${channelId}`);
-    try {
-      await this.unifiedIngressService.ingestInstagram(igPayload, {
-        provider: 'instagram',
-        tenantId,
-        channelId,
-      });
-      this.auditLogger.log(`IG[8/8] ingest_ok tenant_id=${tenantId} latency_ms=${Date.now() - startedAt}`);
-    } catch (err) {
-      this.auditLogger.warn(`IG[8/8] ingest_failed error=${String(err)}`);
-      if (err instanceof HttpException) {
-        this.healthService.record(provider, err.getStatus() < 500, Date.now() - startedAt);
+    if (WhapiController.FF_BULLMQ) {
+      await this.webhookProducer.enqueueIngestion(
+        'instagram',
+        igPayload,
+        requestId,
+        { provider: 'instagram', tenantId, channelId },
+      );
+      this.auditLogger.log(`IG[8/8] bullmq_enqueued tenant_id=${tenantId} latency_ms=${Date.now() - startedAt}`);
+    } else {
+      try {
+        await this.unifiedIngressService.ingestInstagram(igPayload, {
+          provider: 'instagram',
+          tenantId,
+          channelId,
+        });
+        this.auditLogger.log(`IG[8/8] ingest_ok tenant_id=${tenantId} latency_ms=${Date.now() - startedAt}`);
+      } catch (err) {
+        this.auditLogger.warn(`IG[8/8] ingest_failed error=${String(err)}`);
+        if (err instanceof HttpException) {
+          this.healthService.record(provider, err.getStatus() < 500, Date.now() - startedAt);
+          throw err;
+        }
+        this.healthService.record(provider, false, Date.now() - startedAt);
+        this.metricsService.recordError(provider, tenantId, 'exception');
         throw err;
       }
-      this.healthService.record(provider, false, Date.now() - startedAt);
-      this.metricsService.recordError(provider, tenantId, 'exception');
-      throw err;
     }
 
     this.healthService.record(provider, true, Date.now() - startedAt);

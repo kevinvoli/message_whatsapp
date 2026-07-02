@@ -19,6 +19,7 @@ export class UnifiedIngressService {
   async ingestWhapi(
     payload: WhapiWebhookPayload,
     tenantId: string,
+    _correlationId?: string,
   ): Promise<void> {
     const whapiAdapter =
       this.adapterRegistry.getAdapter<WhapiWebhookPayload>('whapi');
@@ -77,6 +78,7 @@ export class UnifiedIngressService {
   async ingestMeta(
     payload: MetaWebhookPayload,
     tenantId: string,
+    _correlationId?: string,
   ): Promise<void> {
     const entry = payload?.entry?.[0];
     const metaValue = entry?.changes?.[0]?.value;
@@ -106,6 +108,7 @@ export class UnifiedIngressService {
   async ingestMessenger(
     payload: MessengerWebhookPayload,
     context: AdapterContext,
+    _correlationId?: string,
   ): Promise<void> {
     const messengerAdapter =
       this.adapterRegistry.getAdapter<MessengerWebhookPayload>('messenger');
@@ -123,6 +126,7 @@ export class UnifiedIngressService {
   async ingestInstagram(
     payload: InstagramWebhookPayload,
     context: AdapterContext,
+    _correlationId?: string,
   ): Promise<void> {
     const instagramAdapter =
       this.adapterRegistry.getAdapter<InstagramWebhookPayload>('instagram');
@@ -140,6 +144,7 @@ export class UnifiedIngressService {
   async ingestTelegram(
     payload: TelegramWebhookPayload,
     context: AdapterContext,
+    _correlationId?: string,
   ): Promise<void> {
     const telegramAdapter =
       this.adapterRegistry.getAdapter<TelegramWebhookPayload>('telegram');

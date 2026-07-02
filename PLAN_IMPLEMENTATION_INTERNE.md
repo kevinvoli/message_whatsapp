@@ -851,23 +851,147 @@ const safePayload = sanitizeObject(payload, ['token', 'webhook_secret', 'meta_ap
 
 ---
 
+## Phase 6 — File de messages robuste — Redis + BullMQ (Jalon J2) ✅ COMPLÈTE — 2026-07-02
+
+### Contexte
+
+**Problème actuel :** `WebhookDegradedQueueService` stocke les tâches webhook en `Map` mémoire.
+Un redémarrage du process = perte des messages en cours de traitement.
+
+Redis est auto-hébergé sur le même serveur que le backend — aucune dépendance externe, même nature que MySQL.
+
+**Note :** `ioredis` est déjà dans les dépendances. Variables `REDIS_*` déjà dans `.env.example`. Infrastructure préparée.
+
+---
+
+### 6.1 Infrastructure Redis — docker-compose.yml
+
+```yaml
+redis:
+  image: redis:7-alpine
+  command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+  volumes: [redis_data:/data]
+  ports: ["6379:6379"]
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 10s
+    retries: 5
+```
+
+**Variables d'environnement à ajouter dans `.env` :**
+```env
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+FF_BULLMQ_WEBHOOK=false   # désactivé par défaut — activer progressivement
+```
+
+**Effort :** 0.5 jour
+
+---
+
+### 6.2 Migration WebhookDegradedQueueService → BullMQ
+
+**Installation :**
+```bash
+npm install @nestjs/bullmq bullmq
+```
+
+**Architecture cible :**
+```
+Webhook entrant
+  → [HMAC validation — E1 toujours actif]
+  → UnifiedIngressService (idempotency check)
+  → BullMQ queue "webhook-inbound" (persisté en Redis)
+    → WebhookWorker (concurrence : 15)
+      → InboundMessageService → DispatcherService
+```
+
+**Migration progressive avec feature flag :**
+```typescript
+// UnifiedIngressService
+if (process.env.FF_BULLMQ_WEBHOOK === 'true') {
+  await this.webhookProducer.enqueue(provider, payload, eventId);
+} else {
+  await this.legacyDegradedQueue.enqueue(provider, payload);
+}
+```
+
+**Circuit breaker Redis obligatoire — si Redis est down, fallback automatique sur la file mémoire :**
+```typescript
+// webhook-producer.service.ts
+async enqueue(provider: string, payload: unknown, eventId: string): Promise<void> {
+  try {
+    await this.queue.add(provider, { provider, payload, eventId }, {
+      jobId: eventId,              // déduplication par eventId (idempotence)
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2_000 },
+      removeOnComplete: 500,
+      removeOnFail: 200,
+    });
+  } catch (err) {
+    this.logger.error(`BullMQ unavailable, falling back to memory queue: ${err instanceof Error ? err.message : String(err)}`);
+    await this.legacyDegradedQueue.enqueue(provider, payload);
+  }
+}
+```
+
+**Limite de concurrence worker ≤ 15** (laisse 15 connexions MySQL libres pour le reste) :
+```typescript
+@Processor('webhook-inbound', { concurrency: 15 })
+```
+
+**Effort :** 3.5 jours
+
+---
+
+#### Risques de régression — Phase 6
+
+| # | Régression | Impact | Probabilité |
+|---|---|---|---|
+| R6.1 | Redis est indisponible et le circuit breaker n'est pas implémenté → tous les webhooks bloqués | **Perte de tous les messages WhatsApp entrants** | **Critique** |
+| R6.2 | La concurrence BullMQ sature le pool MySQL (30 connexions max) | Backend en deadlock DB | **Critique** |
+| R6.3 | `FF_BULLMQ_WEBHOOK=true` activé avant que le worker soit déployé → jobs en file jamais consommés | Messages perdus | Élevée |
+| R6.4 | Jobs en échec s'accumulent et saturent la mémoire Redis (512 MB) | Redis OOM → indisponibilité | Moyenne |
+
+**Ordre de déploiement obligatoire :**
+1. Déployer Redis (vérifier `redis-cli ping` → PONG)
+2. Déployer le backend avec `FF_BULLMQ_WEBHOOK=false` (aucun changement de comportement)
+3. Vérifier en staging que le worker consomme bien les jobs
+4. Activer `FF_BULLMQ_WEBHOOK=true` sur staging pendant 24h
+5. Activer sur production uniquement après validation staging
+
+**Rollback immédiat sans redéploiement :**
+```bash
+FF_BULLMQ_WEBHOOK=false   # modification .env + restart backend
+```
+
+**Smoke test post-déploiement :**
+- [ ] Envoyer un message WhatsApp → reçu côté commercial ✅
+- [ ] Redémarrer le backend pendant un webhook → message reçu malgré tout ✅
+- [ ] Couper Redis → message reçu via fallback mémoire, log warn visible ✅
+
+---
+
 ## Récapitulatif — Tableau de bord
 
 | Phase | Tâche | Effort | Criticité | Jalon | Risques critiques identifiés | Statut |
 |---|---|---|---|---|---|---|
-| 1.1 | Prettier + Husky | 0.5j | P1 | J1 | Conflit ESLint (R1.1a) | |
-| 1.2 | Vitest setup | 1j | P0 | J1 | Modules browser-only (R1.2a), appels API réels (R1.2b) | |
-| 1.3 | Tests hooks (×4) | 3j | P0 | J1 | États partagés entre tests (R1.3c) | |
-| 2.1 | Package socket-contracts | 2j | P1 | J2 | Renommage silencieux d'events (R2.1a) | |
-| 2.2 | Pagination keyset | 1j | P2 | J2 | Paramètres anciens non migrés (R2.2a) | |
-| 3.1 | Refresh token | 2j | P0 | J2 | Déconnexion massive au déploiement (R3.1a/b) | |
-| 3.2 | Rate-limiting | 1j | P1 | J2 | Webhooks throttlés (R3.2a) | |
-| 3.3 | Health endpoint | 1j | P1 | J2 | Fuite d'info (R3.3a) | |
+| 1.1 | Prettier + Husky | 0.5j | P1 | J1 | Conflit ESLint (R1.1a) | ✅ |
+| 1.2 | Vitest setup | 1j | P0 | J1 | Modules browser-only (R1.2a), appels API réels (R1.2b) | ✅ |
+| 1.3 | Tests hooks (×4) | 3j | P0 | J1 | États partagés entre tests (R1.3c) | ✅ |
+| 2.1 | Package socket-contracts | 2j | P1 | J2 | Renommage silencieux d'events (R2.1a) | ✅ |
+| 2.2 | Pagination keyset | 1j | P2 | J2 | Paramètres anciens non migrés (R2.2a) | ✅ |
+| 3.1 | Refresh token | 2j | P0 | J2 | Déconnexion massive au déploiement (R3.1a/b) | ✅ |
+| 3.2 | Rate-limiting | 1j | P1 | J2 | Webhooks throttlés (R3.2a) | ✅ |
+| 3.3 | Health endpoint | 1j | P1 | J2 | Fuite d'info (R3.3a) | ✅ |
 | 4.1 | Index MySQL | 2j | P1 | J3 | Lock table en production (R4.1a) | ✅ |
 | 4.2 | Correction N+1 | 1j | P0 | J3 | OOM par jointure trop large (R4.2a) | ✅ |
-| 5.1 | MySQL docker local | 0.5j | P2 | J3 | Conflit port 3306 (R5.1a) |
-| 5.2 | Audit trail admin | 2j | P2 | J3 | Secrets dans l'audit log (R5.2b) |
-| **Total** | | **~17j** | | | |
+| 5.1 | MySQL docker local | 0.5j | P2 | J3 | Conflit port 3306 (R5.1a) | — abandonné |
+| 5.2 | Audit trail admin | 2j | P2 | J3 | Secrets dans l'audit log (R5.2b) | ✅ |
+| 6.1 | Redis docker-compose | 0.5j | P0 | J2 | — | |
+| 6.2 | BullMQ webhook queue | 3.5j | P0 | J2 | Redis down bloque webhooks (R6.1), pool MySQL saturé (R6.2) | |
+| **Total** | | **~21j** | | | |
 
 ---
 
