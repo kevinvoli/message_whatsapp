@@ -72,7 +72,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reset = useChatStore((s) => s.reset);
-  const loadAffinityChats = useChatStore((s) => s.loadAffinityChats);
   const isRefreshingRef = useRef(false);
 
   useEffect(() => {
@@ -88,7 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         const userData = normalizeUser(response.data);
         setUser(userData);
-        if (userData.poste_id) void loadAffinityChats(userData.poste_id);
       } catch {
         setUser(null);
       } finally {
@@ -227,7 +225,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userData = normalizeUser(response.data.user);
       setUser(userData);
       setToken(response.data.accessToken ?? null);
-      if (userData.poste_id) void loadAffinityChats(userData.poste_id);
     } catch (err) {
       let errorMessage = 'Connexion échouée';
       if (axios.isAxiosError(err)) {
